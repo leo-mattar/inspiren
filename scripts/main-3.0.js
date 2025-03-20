@@ -1,0 +1,689 @@
+// --- GSAP
+gsap.registerPlugin(ScrollTrigger, MotionPathPlugin, CustomEase, DrawSVGPlugin);
+
+gsap.config({
+  nullTargetWarn: false,
+  trialWarn: false,
+});
+
+let mm = gsap.matchMedia();
+
+// --------------- CUSTOM EASE ---------------
+CustomEase.create("ease-out-1", "0.25, 1, 0.5, 1");
+CustomEase.create("ease-in-out-1", "0.87, 0, 0.13, 1");
+
+// --- GLOBAL - RELOAD AT THE TOP
+window.addEventListener("beforeunload", function () {
+  history.scrollRestoration = "manual";
+});
+
+// --- LENIS
+window.lenis = new Lenis();
+
+lenis.on("scroll", ScrollTrigger.update);
+
+gsap.ticker.add((time) => {
+  lenis.raf(time * 1000);
+});
+
+gsap.ticker.lagSmoothing(0);
+
+// --- PAPER TIGET SIGNATURE
+const pprtgr = [
+  'color: #F2F3F3',
+  'background: #080808',
+  'font-size: 12px',
+  'padding-left: 10px',
+  'line-height: 2',
+  'border-left: 5px solid #ff3c31',
+].join(';');
+console.info(`
+
+%cWebsite by Paper Tiger${' '}
+www.papertiger.com${'     '}
+
+`, pprtgr);
+
+// --------------- GLOBAL FADE ---------------
+function fade() {
+  const fadeElements = document.querySelectorAll("[fade]");
+
+  gsap.set(fadeElements, { opacity: 0, y: "5em" });
+
+  ScrollTrigger.batch("[fade]", {
+    once: true,
+    onEnter: (batch) =>
+      gsap.to(batch, {
+        opacity: 1,
+        y: 0,
+        duration: 1.2,
+        ease: "ease-out-1",
+        stagger: 0.15,
+      }),
+  });
+}
+
+// --- REVIEWS SLIDER
+function reviewsSlider() {
+  const slider = new Swiper(".swiper.reviews", {
+    slidesPerView: 1,
+    speed: 500,
+    loop: true,
+    effect: "fade",
+    fadeEffect: {
+      crossFade: true,
+    },
+    pagination: {
+      el: ".swiper-pagination.reviews",
+      clickable: true,
+    },
+    autoplay: {
+      delay: 6000,
+      disableOnInteraction: true,
+    },
+    on: {
+      init: function () {
+        const originalControls = document.querySelector(".swiper-controls");
+        if (originalControls) originalControls.style.display = "none";
+        cloneControlsAndAttachEvents(this);
+
+        // Initial strict control of slide interactivity
+        enforceStrictSlideInteractivity(this);
+      },
+      slideChange: function () {
+        // Enforce strict slide control after every slide change
+        enforceStrictSlideInteractivity(this);
+      },
+      transitionEnd: function () {
+        // Additional check after transition completes
+        enforceStrictSlideInteractivity(this);
+      },
+      touchEnd: function () {
+        // After touch interaction, ensure proper slide control
+        setTimeout(() => {
+          enforceStrictSlideInteractivity(this);
+        }, 50);
+      }
+    },
+  });
+
+  // Add a global click handler for mobile fallback
+  document.addEventListener('click', (e) => {
+    const nextButton = e.target.closest('.swiper-next');
+    const prevButton = e.target.closest('.swiper-prev');
+    const bullet = e.target.closest('.swiper-pagination-bullet');
+
+    if (nextButton) {
+      slider.slideNext();
+    } else if (prevButton) {
+      slider.slidePrev();
+    } else if (bullet && bullet.parentElement.classList.contains('reviews')) {
+      const allBullets = Array.from(bullet.parentElement.querySelectorAll(
+        '.swiper-pagination-bullet'));
+      const bulletIndex = allBullets.indexOf(bullet);
+      if (bulletIndex >= 0) {
+        slider.slideToLoop(bulletIndex);
+      }
+    }
+  });
+
+  return slider;
+}
+
+function cloneControlsAndAttachEvents(sliderInstance) {
+  const originalControls = document.querySelector(".swiper-controls");
+  const slides = document.querySelectorAll(".swiper-slide.reviews");
+
+  if (originalControls && slides.length) {
+    slides.forEach((slide, index) => {
+      const placeholder = slide.querySelector(".swiper-controls-placeholder");
+      if (placeholder) {
+        const clonedControls = originalControls.cloneNode(true);
+        clonedControls.style.display = "flex";
+
+        // Assign unique classes to prev/next buttons
+        const nextButton = clonedControls.querySelector(".swiper-next");
+        const prevButton = clonedControls.querySelector(".swiper-prev");
+
+        if (nextButton) {
+          nextButton.classList.add(`swiper-next-${index}`);
+          nextButton.addEventListener("click", (e) => {
+            e.stopPropagation();
+            sliderInstance.slideNext();
+          });
+        }
+
+        if (prevButton) {
+          prevButton.classList.add(`swiper-prev-${index}`);
+          prevButton.addEventListener("click", (e) => {
+            e.stopPropagation();
+            sliderInstance.slidePrev();
+          });
+        }
+
+        placeholder.appendChild(clonedControls);
+
+        // Attach bullet click event
+        const bullets = clonedControls.querySelectorAll(
+          ".swiper-pagination-bullet"
+        );
+        bullets.forEach((bullet, bulletIndex) => {
+          bullet.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            sliderInstance.slideToLoop(bulletIndex);
+          });
+        });
+      }
+    });
+  }
+}
+
+// New comprehensive function to strictly enforce only one active slide
+function enforceStrictSlideInteractivity(sliderInstance) {
+  // First, disable ALL slides
+  const allSlides = document.querySelectorAll(".swiper-slide.reviews");
+  allSlides.forEach(slide => {
+    slide.style.pointerEvents = "none";
+  });
+
+  // Get the real active slide
+  const activeSlide = document.querySelector(".swiper-slide.reviews.swiper-slide-active");
+  if (!activeSlide) return;
+
+  // Enable pointer events on ONLY the active slide
+  activeSlide.style.pointerEvents = "auto";
+
+  // Update all bullets to show proper active state
+  const activeIndex = sliderInstance.realIndex;
+  updateAllBullets(activeIndex);
+
+  // Ensure the active slide's controls are responsive
+  const activeControls = activeSlide.querySelector(".swiper-controls-placeholder");
+  if (activeControls) {
+    activeControls.style.pointerEvents = "auto";
+
+    // Ensure all control elements are responsive
+    activeControls.querySelectorAll("*").forEach(el => {
+      el.style.pointerEvents = "auto";
+    });
+  }
+}
+
+function updateAllBullets(activeIndex) {
+  // Update all pagination bullets to show correct active state
+  document.querySelectorAll(".swiper-pagination-bullet").forEach((bullet, index) => {
+    const bulletControls = bullet.closest(".swiper-controls");
+    const bulletIndex = Array.from(bulletControls.querySelectorAll(".swiper-pagination-bullet"))
+      .indexOf(bullet);
+
+    bullet.classList.toggle("swiper-pagination-bullet-active", bulletIndex === activeIndex);
+  });
+}
+// --------------- HEADER SCROLLED ---------------
+function headerScrolled() {
+  const header = document.querySelector(".c-header");
+
+  if (!header) return;
+
+  ScrollTrigger.create({
+    trigger: "body",
+    start: "100 top",
+    onToggle: (self) => {
+      if (self.isActive) {
+        header.classList.add("scrolled");
+      } else {
+        header.classList.remove("scrolled");
+      }
+    }
+  });
+}
+
+function logosMarquee() {
+  const marquee = document.querySelector(".c-marquee");
+  if (!marquee) return;
+
+  const marqueeItems = document.querySelectorAll(".c-img-contain.marquee-logo");
+  if (marqueeItems.length <= 5) return;
+
+  const marqueeList = document.querySelector(".c-marquee-list");
+
+  if (marqueeList) {
+    marqueeList.style.justifyContent = "flex-end";
+    marqueeList.style.alignItems = "center";
+    marqueeList.style.gridColumnGap = "0em";
+    marqueeList.style.gridRowGap = "0em";
+    marqueeList.style.flexGrow = "0";
+    marqueeList.style.flexShrink = "0";
+    marqueeList.style.flexBasis = "auto";
+    marquee.style.display = "flex";
+    marquee.style.justifyContent = "flex-end";
+    marquee.style.alignItems = "center";
+  }
+
+  marqueeItems.forEach(item => {
+    item.style.marginRight = "2.25em";
+  });
+
+  const duplicatedList = marqueeList.cloneNode(true);
+  marquee.appendChild(duplicatedList);
+
+  const marqueeDuration = window.innerWidth <= 479 ? marqueeItems.length * 1.8 : marqueeItems
+    .length * 5;
+
+  const tl = gsap.timeline();
+  tl.to([marqueeList, duplicatedList], {
+    xPercent: 100,
+    duration: marqueeDuration,
+    ease: "linear",
+    repeat: -1
+  });
+}
+
+function cardsMainLines() {
+
+  const tl = gsap.timeline({
+    defaults: {
+      ease: "ease-out-1",
+      duration: 6
+    },
+    scrollTrigger: {
+      trigger: ".c-cards-lines",
+      start: "top 90%",
+    }
+  });
+
+  tl.fromTo("#card-main-3", { drawSVG: "0%" }, { drawSVG: "100%" });
+  tl.fromTo("#card-main-1", { drawSVG: "0%" }, { drawSVG: "100%" }, "<0.3");
+  tl.fromTo("#card-main-2", { drawSVG: "0%" }, { drawSVG: "100%" }, "<0.6");
+  tl.fromTo("#card-main-4", { drawSVG: "0%" }, { drawSVG: "100%", duration: 1.2 }, "<");
+  tl.fromTo("#card-main-5", { drawSVG: "0%" }, { drawSVG: "100%", duration: 1.2 }, "<");
+}
+
+// --- CARDS
+function cardsAnimation() {
+  const cards = document.querySelectorAll(".c-card");
+  if (cards.length === 0) return;
+  const card1 = document.querySelector(".c-card.is-1");
+  const card1Line = card1.querySelector("#card-1-line");
+
+  const tl = gsap.timeline({
+    defaults: {
+      ease: "ease-out-1",
+      duration: 1.2
+    },
+    scrollTrigger: {
+      trigger: ".c-cards-wrap",
+      start: "top 70%",
+      // once: true,
+      toggleActions: "play none restart none"
+    }
+  });
+
+  gsap.set(cards, { y: "6em", opacity: 0 });
+  gsap.set("#card-4-circle", { transformOrigin: "center center" });
+
+  tl.to(cards, {
+    duration: 1.6,
+    y: 0,
+    opacity: 1,
+    stagger: 0.3
+  })
+
+  tl.fromTo(card1Line, { drawSVG: "0%" }, { drawSVG: "100%", duration: 4 }, "<1");
+
+  tl.fromTo(
+    "#card-2-path-1", { clipPath: "inset(0% 0% 100% 0%)" }, {
+      clipPath: "inset(0% 0% 0% 0%)",
+      duration: 1.2
+    }, "<0.8");
+
+  tl.fromTo(
+    "#card-2-path-2", { clipPath: "inset(100% 0% 0% 0%)" }, {
+      clipPath: "inset(0% 0% 0% 0%)",
+      duration: 1.2
+    }, "<0.4");
+
+  tl.from("#card-4-num", {
+    y: "1em",
+    opacity: 0,
+    duration: 1
+  }, "<0.2");
+
+  tl.from("#card-4-circle", {
+    scale: 0,
+    duration: 1
+  }, "<0.2");
+
+  tl.from("#card-4-arrow", {
+    y: "0.25em",
+    opacity: 0,
+    duration: 1
+  }, "<0.2");
+}
+
+function circleAnimation() {
+  const circles = document.querySelectorAll("[data-circle-animation='true']");
+  if (circles.length === 0) return;
+
+  circles.forEach(circle => {
+
+    gsap.set([".c-circle-2", ".c-circle.is-1"], {
+      rotation: 0
+    });
+
+    gsap.fromTo(circle, { clipPath: "inset(0% 0% 100% 0%)" },
+    {
+      clipPath: "inset(0% 0% 0% 0%)",
+      duration: 2,
+      ease: "ease-out-1",
+      scrollTrigger: {
+        trigger: circle,
+        start: "top center",
+        once: true,
+      },
+      onComplete: () => {
+        gsap.to(".c-circle.is-1", {
+          rotation: 360,
+          duration: 30,
+          ease: "linear",
+          repeat: -1,
+        });
+
+        gsap.to(".c-circle-2", {
+          rotation: 360,
+          duration: 30,
+          ease: "linear",
+          repeat: -1,
+        });
+      }
+    });
+  });
+}
+
+// --------------- VIMEO MODAL ---------------
+function videoModals() {
+  const triggers = document.querySelectorAll("[data-modal-trigger]");
+  const body = document.querySelector("body");
+
+  if (!triggers.length) return;
+
+  triggers.forEach(trigger => {
+    const modalId = trigger.getAttribute("data-modal-trigger");
+    const modal = document.querySelector(`[data-modal-id='${modalId}']`);
+    if (!modal) return;
+
+    const iframe = modal.querySelector("iframe");
+    const modalCloseBtn = modal.querySelector(".c-modal-close-btn");
+    if (!iframe) return;
+
+    const player = new Vimeo.Player(iframe);
+
+    function openModal() {
+      lenis.stop();
+      modal.classList.add("is-open");
+      player.play();
+    }
+
+    function closeModal() {
+      lenis.start();
+      modal.classList.remove("is-open");
+      player.pause();
+      body.classList.remove("no-scroll");
+    }
+
+    trigger.addEventListener("click", openModal);
+    modalCloseBtn.addEventListener("click", closeModal);
+
+    modal.addEventListener("click", event => {
+      if (event.target === modal) {
+        closeModal();
+      }
+    });
+
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && modal.classList.contains("is-open")) {
+        closeModal();
+      }
+    });
+  });
+}
+
+// --- FOOTER MARQUEE
+function footerMarquee() {
+  const marqueeRowOne = document.querySelector(".c-footer-marquee");
+  const marqueeRowTwo = document.querySelector(".c-footer-marquee-reverse");
+
+  if (!marqueeRowOne || !marqueeRowTwo) return;
+
+  const marqueeRowOneList = marqueeRowOne.querySelector(".c-footer-marquee-list");
+  const marqueeRowOneListDuplicated = marqueeRowOneList.cloneNode(true);
+
+  marqueeRowOne.appendChild(marqueeRowOneListDuplicated);
+
+  const marqueeRowTwoList = marqueeRowTwo.querySelector(".c-footer-marquee-list-reverse");
+  const marqueeRowTwoListDuplicated = marqueeRowTwoList.cloneNode(true);
+
+  marqueeRowTwo.appendChild(marqueeRowTwoListDuplicated);
+
+  const marqueeDuration = window.innerWidth <= 479 ? 40 : 60;
+
+  gsap.to([marqueeRowOneList, marqueeRowOneListDuplicated], {
+    xPercent: 100,
+    duration: marqueeDuration,
+    ease: "linear",
+    repeat: -1
+  });
+
+  gsap.to([marqueeRowTwoList, marqueeRowTwoListDuplicated], {
+    xPercent: -100,
+    duration: marqueeDuration,
+    ease: "linear",
+    repeat: -1
+  });
+}
+
+// --- DATA GRAPH
+function dataGraph() {
+  const statsText = document.querySelectorAll("[data-count-up='true']");
+  // let counterHasRun = false; // Flag to check if the counter has run
+
+  // const tl = gsap.timeline({
+  //   scrollTrigger: {
+  //     trigger: ".c-data-wrap",
+  //     start: "top center",
+  //     once: true,
+  //   },
+  //   repeat: -1,
+  //   repeatDelay: 3,
+  // });
+
+  // tl.from(".c-data-wrap", {
+  //     // y: "4em",
+  //     opacity: 0,
+  //     stagger: 0.08,
+  //     duration: 1,
+  //     ease: "ease-out-1"
+  //   })
+  //   .add(() => {
+  //     if (!counterHasRun) { // Run statsCounter only once
+  //       statsCounter();
+  //       counterHasRun = true; // Set the flag to true after running
+  //     }
+  //   }, "0.2");
+
+  const tl = gsap.timeline({
+    scrollTrigger: {
+      trigger: ".c-data-wrap",
+      start: "top center",
+      once: true,
+    },
+    // repeat: -1,
+    // repeatDelay: 3,
+  });
+
+  tl.from(".c-data-wrap", {
+      opacity: 0,
+      stagger: 0.08,
+      duration: 1,
+      ease: "ease-out-1"
+    })
+    .add(() => {
+      statsCounter();
+    }, "0.2");
+}
+
+// --- GLOBAL - STATS COUNTER
+function statsCounter() {
+  document.querySelectorAll("[data-count-up='true']").forEach((element, index) => {
+    let thisId = "countup" + index;
+    element.setAttribute("id", thisId);
+
+    let finalValue = element.getAttribute("final-number");
+    let cleanValue = finalValue.replace(/,/g, "");
+    let match = cleanValue.match(/^([\d.]+)(\D*)$/);
+
+    if (match) {
+      let numberPart = match[1];
+      let endNumber = parseFloat(numberPart);
+      let suffix = match[2] || "";
+
+      let decimals = element.hasAttribute("decimals") ?
+        +element.getAttribute("decimals") :
+        numberPart.includes(".") ?
+        numberPart.split(".")[1].length :
+        0;
+
+      let startNumber = 0;
+      let duration = element.getAttribute("count-duration");
+      let useCommas = finalValue.includes(",");
+
+      let myCounter = new CountUp(
+        thisId,
+        startNumber,
+        endNumber,
+        decimals,
+        duration,
+        {
+          suffix: suffix,
+          useGrouping: useCommas,
+          decimalPlaces: decimals,
+        }
+      );
+
+      ScrollTrigger.create({
+        trigger: element,
+        start: "top bottom",
+        onEnter: () => {
+          gsap.to(element, {
+            delay: index * 0.1,
+            onStart: () => myCounter.start(),
+          });
+        },
+      });
+    } else {
+      console.error(`Invalid final-number attribute: ${finalValue}`);
+    }
+  });
+}
+
+function hideHeaderCta() {
+
+  const heroSection = document.querySelector(".c-section.hm-hero");
+  if (!heroSection) return;
+
+  gsap.to(".c-header .c-btn", {
+    scrollTrigger: {
+      trigger: heroSection,
+      start: "100 top",
+      end: "bottom top",
+      onEnter: () => {
+        gsap.to(".c-header .c-btn", { autoAlpha: 1, duration: 0.6, ease: "power3.inOut" });
+      },
+      // onLeave: () => {
+      //   gsap.to(".c-header .c-btn", { autoAlpha: 1, duration: 0.6, ease: "power3.inOut" });
+      // },
+      // onEnterBack: () => {
+      //   gsap.to(".c-header .c-btn", { autoAlpha: 0, duration: 0.6, ease: "power3.inOut" });
+      // }
+    }
+  });
+}
+
+// --- ICONS ANIMATION
+function iconAnimation() {
+  const instances = document.querySelectorAll(".c-timeline-item");
+
+  instances.forEach(instance => {
+    const paths = instance.querySelectorAll("[data-icon='draw'] path");
+    const text = instance.querySelector(".t-display-3");
+
+    gsap.set(paths, { fill: "rgba(217, 31, 92, 0)" });
+
+    const tl = gsap.timeline({
+      defaults: {
+        ease: "ease-out-1"
+      },
+      scrollTrigger: {
+        trigger: instance,
+        start: "top bottom",
+        once: true,
+      },
+      // repeat: -1, 
+    });
+
+    gsap.set(text, { opacity: 0, y: "5em" });
+
+    tl.from(paths, {
+      drawSVG: 0,
+      stagger: 0.05,
+      duration: 1.2,
+    });
+
+    tl.to(paths, {
+      fill: "rgba(217, 31, 92, 1)",
+      duration: 1.2,
+    });
+
+    tl.to(text, {
+      opacity: 1,
+      y: 0,
+      duration: 1.2,
+      ease: "ease-out-1",
+    }, "0.4");
+
+  });
+};
+
+// --- INIT
+function init() {
+  reviewsSlider();
+  headerScrolled();
+  cardsAnimation();
+  cardsMainLines();
+  // circleAnimation();
+  videoModals();
+  footerMarquee();
+  dataGraph();
+  fade();
+  iconAnimation();
+}
+
+init();
+
+// --- MATCHMEDIA - DESKTOP
+mm.add("(min-width: 992px)", () => {
+  logosMarquee();
+  circleAnimation();
+  return () => {
+    //
+  };
+});
+
+// --- MATCHMEDIA - TABLET AND MOBILE
+mm.add("(max-width: 991px)", () => {
+  hideHeaderCta();
+  return () => {
+    //
+  };
+});
